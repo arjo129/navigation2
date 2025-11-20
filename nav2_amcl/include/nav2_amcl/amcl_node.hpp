@@ -232,6 +232,13 @@ protected:
     const std::shared_ptr<std_srvs::srv::Empty::Request> request,
     std::shared_ptr<std_srvs::srv::Empty::Response> response);
 
+  /*
+   * @brief Sets initial particle cloud externally
+   */
+  void setInitialParticleCloud(nav2_msgs::msg::ParticleCloud::ConstSharedPtr particle_cloud);
+  rclcpp::Subscription<nav2_msgs::msg::ParticleCloud>::ConstSharedPtr
+    initial_particle_cloud_sub_;
+  std::string initial_particle_topic_{"initial_particle_cloud"};
   // Nomotion update control. Used to temporarily let amcl update samples even when no motion occurs
   std::atomic<bool> force_update_{false};
 

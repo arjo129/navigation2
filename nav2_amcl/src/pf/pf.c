@@ -35,6 +35,7 @@
 #include "nav2_amcl/pf/pf_pdf.hpp"
 #include "nav2_amcl/pf/pf_kdtree.hpp"
 
+#include "nav2_amcl/pf/pf_vector.hpp"
 #include "nav2_amcl/portable_utils.hpp"
 
 
@@ -161,7 +162,6 @@ void pf_init(pf_t * pf, pf_vector_t mean, pf_matrix_t cov)
   pf_init_converged(pf);
 }
 
-
 // Initialize the filter using some model
 void pf_init_model(pf_t * pf, pf_init_model_fn_t init_fn, void * init_data)
 {
@@ -181,6 +181,39 @@ void pf_init_model(pf_t * pf, pf_init_model_fn_t init_fn, void * init_data)
     sample = set->samples + i;
     sample->weight = 1.0 / pf->max_samples;
     sample->pose = (*init_fn)(init_data);
+
+    // Add sample to histogram
+    pf_kdtree_insert(set->kdtree, sample->pose, sample->weight);
+  }
+
+  pf->w_slow = pf->w_fast = 0.0;
+
+  // Re-compute cluster statistics
+  pf_cluster_stats(pf, set);
+
+  // set converged to 0
+  pf_init_converged(pf);
+}
+
+void pf_init_particles(pf_t *pf, pf_vector_t * vector)
+{
+  
+  int i;
+  pf_sample_set_t * set;
+  pf_sample_t * sample;
+
+  set = pf->sets + pf->current_set;
+
+  // Create the kd tree for adaptive sampling
+  pf_kdtree_clear(set->kdtree);
+
+  set->sample_count = pf->max_samples;
+
+  // Compute the new sample poses
+  for (i = 0; i < set->sample_count; i++) {
+    sample = set->samples + i;
+    sample->weight = 1.0 / pf->max_samples;
+    sample->pose = vector[i];
 
     // Add sample to histogram
     pf_kdtree_insert(set->kdtree, sample->pose, sample->weight);

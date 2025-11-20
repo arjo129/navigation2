@@ -30,6 +30,8 @@
 
 #include "message_filters/subscriber.h"
 #include "nav2_amcl/angleutils.hpp"
+#include "nav2_amcl/pf/pf_vector.hpp"
+#include "nav2_msgs/msg/particle_cloud.hpp"
 #include "nav2_util/geometry_utils.hpp"
 #include "nav2_amcl/pf/pf.hpp"
 #include "nav2_util/string_utils.hpp"
@@ -520,6 +522,37 @@ AmclNode::nomotionUpdateCallback(
 {
   RCLCPP_INFO(get_logger(), "Requesting no-motion update");
   force_update_ = true;
+}
+void
+AmclNode::setInitialParticleCloud(nav2_msgs::msg::ParticleCloud::ConstSharedPtr particle_cloud) 
+{
+  std::lock_guard<std::recursive_mutex> cfl(mutex_);
+  RCLCPP_INFO(get_logger(), "Setting an initial particle cloud");
+
+  if (!first_map_received_)
+  {
+    RCLCPP_ERROR(
+      get_logger(), "First Map not recieved");
+    return;
+  }
+
+  if (pf_->max_samples != (int)particle_cloud->particles.size())
+  {
+    RCLCPP_ERROR(get_logger(), "Expected %d particles in cloud but got %lu", 
+                 pf_->max_samples, particle_cloud->particles.size());
+    return;
+  }
+
+  std::vector<pf_vector_t> particles;
+  for (auto particle: particle_cloud->particles) {
+    pf_vector_t p;
+    p.v[0] = particle.pose.position.x;
+    p.v[1] = particle.pose.position.y;
+    p.v[2] = particle.pose.orientation.w;
+    particles.push_back(p);
+  }
+
+  pf_init_particles(pf_, particles.data());
 }
 
 void
@@ -1563,6 +1596,10 @@ AmclNode::initPubSub()
     map_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
     std::bind(&AmclNode::mapReceived, this, std::placeholders::_1));
 
+  initial_particle_cloud_sub_ = create_subscription<nav2_msgs::msg::ParticleCloud>(
+    initial_particle_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+    std::bind(&AmclNode::setInitialParticleCloud, this, std::placeholders::_1));
+  
   RCLCPP_INFO(get_logger(), "Subscribed to map topic.");
 }
 
