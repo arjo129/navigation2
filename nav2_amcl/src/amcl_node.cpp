@@ -553,6 +553,9 @@ AmclNode::setInitialParticleCloud(nav2_msgs::msg::ParticleCloud::ConstSharedPtr 
   }
 
   pf_init_particles(pf_, particles.data());
+
+  initial_pose_is_known_ = true;
+  pf_init_ = false;
 }
 
 void
